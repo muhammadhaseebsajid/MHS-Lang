@@ -1,0 +1,18 @@
+fn main() {
+    print("=== Welcome to the MHS Guessing Game ===")
+    var secret := random_int(100)
+    var guess := 0
+    var attempts := 0
+    while (guess != secret) {
+        var input_str := input("Enter a guess (0-99): ")
+        guess := to_int(input_str)
+        attempts := attempts + 1
+        if (guess < secret) {
+            print("Too low!")
+        }
+        if (guess > secret) {
+            print("Too high!")
+        }
+    }
+    print("Congratulations! You found it in " + attempts + " tries.")
+}
