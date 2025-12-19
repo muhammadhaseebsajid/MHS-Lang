@@ -1,0 +1,6 @@
+fn main() {
+    print("Hello from MHS!")
+    val list := [1, 2, 3]
+    push(list, 4)
+    print("List length: " + len(list))
+}
