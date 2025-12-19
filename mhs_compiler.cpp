@@ -9,6 +9,7 @@
 #include <limits>
 #include <memory>
 #include <ctime>
+#include <cstdlib>
 
 struct VarInfo { bool isMutable; };
 
@@ -443,7 +444,6 @@ class Compiler {
     std::set<std::string> structNames;
     std::map<std::string, std::vector<std::string>> structDefs;
     std::vector<std::string> methodDispatchers;
-
     std::string escape_cpp(std::string s) {
         std::string out;
         for (char c : s) {
@@ -453,7 +453,6 @@ class Compiler {
         }
         return out;
     }
-
 public:
     std::string generate(ASTNode* node, std::map<std::string, VarInfo>& scope) {
         if (!node) return "";
@@ -502,12 +501,24 @@ public:
             if (node->name == "write_file") return "Value(std_write_file(" + generate(node->args[0], scope) + ".sVal, " + generate(node->args[1], scope) + ".sVal))";
             if (node->name == "len") return "Value((int)" + generate(node->args[0], scope) + ".len())";
             if (node->name == "push") {
-                // FIXED: array_push is void, do not wrap in Value()
                 return generate(node->args[0], scope) + ".array_push(" + generate(node->args[1], scope) + ")";
             }
             if (node->name == "at") return generate(node->args[0], scope) + ".at(" + generate(node->args[1], scope) + ".iVal)";
             if (node->name == "str_len") return "Value((int)" + generate(node->args[0], scope) + ".sVal.length())";
             if (node->name == "str_at") return "Value(std::string(1, " + generate(node->args[0], scope) + ".sVal[" + generate(node->args[1], scope) + ".iVal]))";
+            if (node->name == "random_int") {
+                return "Value(std_random(0, " + generate(node->args[0], scope) + ".iVal - 1))";
+            }
+            if (node->name == "input") {
+                if (node->args.empty()) {
+                    return "Value(std_input())";
+                } else {
+                    return "Value(std_input(" + generate(node->args[0], scope) + ".sVal))";
+                }
+            }
+            if (node->name == "to_int") {
+                return "Value(std_to_int(" + generate(node->args[0], scope) + ".sVal))";
+            }
             if (structNames.count(node->name)) {
                 std::string s = "Value::make_struct(\"" + node->name + "\", {";
                 for (size_t i = 0; i < node->args.size(); i++) {
@@ -644,7 +655,7 @@ int main(int argc, char* argv[]) {
     Parser p(l.tokenize());
     Compiler c;
     std::ofstream out("output.cpp");
-    out << "#include <iostream>\n#include <fstream>\n#include <sstream>\n#include <string>\n#include <vector>\n#include <map>\n#include <memory>\n#include <limits>\n#include <ctime>\n";
+    out << "#include <iostream>\n#include <fstream>\n#include <sstream>\n#include <string>\n#include <vector>\n#include <map>\n#include <memory>\n#include <limits>\n#include <ctime>\n#include <cstdlib>\n";
     out << "struct Value;\n";
     out << "Value mhs_dispatch_method(Value, std::string, std::vector<Value>);\n";
     out << "struct Value {\n";
@@ -683,11 +694,19 @@ int main(int argc, char* argv[]) {
     out << " Value operator>(const Value& o) const { return Value((int)(iVal > o.iVal)); }\n";
     out << " Value operator<(const Value& o) const { return Value((int)(iVal < o.iVal)); }\n";
     out << " Value operator==(const Value& o) const { if(type!=o.type) return Value(0); if(type==1) return Value((int)(iVal==o.iVal)); return Value((int)(sVal==o.sVal)); }\n";
+    out << " Value operator!=(const Value& o) const { return Value((int)!((*this == o).is_true())); }\n";  // ← FINAL WORKING FIX
     out << " Value operator&&(const Value& o) const { return Value((int)(iVal && o.iVal)); }\n";
     out << " std::string to_string() const { std::stringstream ss; ss << *this; return ss.str(); }\n";
     out << "};\n";
     out << "Value mhs_main();\n";
     out << "int main() { mhs_main(); return 0; }\n";
+
+    // RUNTIME FUNCTIONS
+    out << "int std_random(int min, int max) { static bool init = false; if(!init){srand(time(0)); init=true;} return min + rand() % (max - min + 1); }\n";
+    out << "std::string std_input() { std::string s; std::getline(std::cin, s); return s; }\n";
+    out << "std::string std_input(std::string prompt) { std::cout << prompt; std::string s; std::getline(std::cin, s); return s; }\n";
+    out << "long long std_to_int(std::string s) { try { return std::stoll(s); } catch (...) { std::cerr << \"[PANIC] Invalid number: \\\"\" << s << \"\\\"\" << std::endl; exit(1); } }\n";
+
     std::map<std::string, VarInfo> empty;
     out << c.generate(p.parseProgram(), empty);
     out.close();
