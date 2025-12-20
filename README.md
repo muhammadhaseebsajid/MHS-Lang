@@ -1,7 +1,7 @@
 
 # MHS Programming Language
 
-**MHS** – A minimal, safe, dynamic, self-hosting programming language with elegant `:=` syntax and native performance.
+**MHS** – A minimal, safe, dynamic programming language with elegant `:=` syntax and native performance.
 
 ## Features
 
